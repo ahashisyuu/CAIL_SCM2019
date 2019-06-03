@@ -171,13 +171,13 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
             (assignment_map, initialized_variable_names) = modeling.get_assigment_map_from_checkpoint(tvars, init_checkpoint)
             tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
-        tf.logging.info("**** Trainable Variables ****")
-        for var in tvars:
-            init_string = ""
-            if var.name[6:] in initialized_variable_names:
-                init_string = ", *INIT_FROM_CKPT*"
-            tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
-                            init_string)
+        # tf.logging.info("**** Trainable Variables ****")
+        # for var in tvars:
+        #     init_string = ""
+        #     if var.name[6:] in initialized_variable_names:
+        #         init_string = ", *INIT_FROM_CKPT*"
+        #     tf.logging.info("  name = %s, shape = %s%s", var.name, var.shape,
+        #                     init_string)
 
         if mode == tfes.estimator.ModeKeys.TRAIN:
             original_loss = tf.nn.relu(margin - pos_logits + neg_logits)
