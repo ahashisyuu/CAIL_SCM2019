@@ -19,7 +19,10 @@ def convert_examples(examples, tokenizer):
         a_tokens = tokenizer.tokenize(example.A)
         b_tokens = tokenizer.tokenize(example.B)
         c_tokens = tokenizer.tokenize(example.C)
-
+        # if example_index < 5:
+        #     print(a_tokens)
+        #     print(b_tokens)
+        #     print(c_tokens)
         if len(a_tokens) > a_len:
             a_len = len(a_tokens)
         if len(b_tokens) > b_len:
@@ -32,7 +35,7 @@ def convert_examples(examples, tokenizer):
         c_ids = tokenizer.convert_tokens_to_ids(c_tokens)
 
         example_tokens.append([a_ids, b_ids, c_ids])
-
+    # print(a_len, b_len, c_len)
     return example_tokens, [a_len, b_len, c_len]
 
 
