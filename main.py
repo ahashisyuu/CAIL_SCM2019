@@ -15,7 +15,8 @@ import tokenization
 import tensorflow as tf
 
 from tensorflow.contrib import tpu
-from estimator_utils import model_fn_builder, input_fn_builder, convert_ids_to_features, EvalHook
+from estimator_utils import model_fn_builder, input_fn_builder, \
+    convert_ids_to_features, convert_ids_to_features_v2, EvalHook
 from data_process.split_data import Example, convert_examples
 
 flags = tf.flags
@@ -25,7 +26,7 @@ FLAGS = flags.FLAGS
 
 class Config:
     data_dir = './data'
-    data_file = "data_liu.json"
+    data_file = "data.json"
     # test_file = "../input/input.txt"
     test_file = "./data/input.txt"
     # bert_dir = './model/bert/'
@@ -36,11 +37,11 @@ class Config:
     init_checkpoint = bert_dir + 'bert_model.ckpt'
     # init_checkpoint = None
     do_lower_case = True
-    max_seq_length = 512
+    max_seq_length = 511
     margin = 5.0
     do_pro = False
     do_train = True
-    do_eval = True
+    do_eval = False
     train_batch_size = 2
     eval_batch_size = 2
     learning_rate = 2e-5

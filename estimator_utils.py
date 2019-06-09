@@ -19,8 +19,9 @@ from tensorflow.python.training.session_run_hook import SessionRunArgs, SessionR
 
 
 class Features:
-    def __init__(self, pos_input_ids, pos_input_mask, pos_segment_ids,
+    def __init__(self, instance_id, pos_input_ids, pos_input_mask, pos_segment_ids,
                  neg_input_ids, neg_input_mask, neg_segment_ids):
+        self.instance_id = instance_id
         self.pos_input_ids = pos_input_ids
         self.pos_input_mask = pos_input_mask
         self.pos_segment_ids = pos_segment_ids
@@ -81,7 +82,7 @@ def convert_ids_to_features(token_ids, tokenizer, max_seq_length, is_training):
     delimiter = tokenizer.convert_tokens_to_ids(["[CLS]", "[SEP]"])
 
     features = []
-    for each_token_ids in token_ids:
+    for i, each_token_ids in enumerate(token_ids):
         sent12_ids = each_token_ids[0]
         sent13_ids = copy(each_token_ids[0])
         sent2_ids = each_token_ids[1]
@@ -96,12 +97,64 @@ def convert_ids_to_features(token_ids, tokenizer, max_seq_length, is_training):
         if is_training:
             neg_features = combine_and_padding(sent13_ids, sent3_ids, max_seq_length, delimiter)
 
-        features.append(Features(pos_input_ids=pos_features[0],
+        features.append(Features(instance_id=i,
+                                 pos_input_ids=pos_features[0],
                                  pos_input_mask=pos_features[1],
                                  pos_segment_ids=pos_features[2],
                                  neg_input_ids=neg_features[0],
                                  neg_input_mask=neg_features[1],
                                  neg_segment_ids=neg_features[2]))
+
+    return features
+
+
+def convert_ids_to_features_v2(token_ids, tokenizer, max_seq_length, is_training, min_spans=10):
+    delimiter = tokenizer.convert_tokens_to_ids(["[CLS]", "[SEP]"])
+
+    features = []
+    for example_id, each_token_ids in enumerate(token_ids):
+        sent12_ids = each_token_ids[0]
+        sent13_ids = copy(each_token_ids[0])
+        sent2_ids = each_token_ids[1]
+        sent3_ids = each_token_ids[2]
+
+        sent12_spans = [sent12_ids[start_index:start_index+254]
+                        for start_index in range(0, len(sent12_ids), 254)]
+        sent13_spans = [sent13_ids[start_index:start_index+254]
+                        for start_index in range(0, len(sent13_ids), 254)]
+        sent2_spans = [sent2_ids[start_index:start_index+254]
+                       for start_index in range(0, len(sent2_ids), 254)]
+        sent3_spans = [sent3_ids[start_index:start_index+254]
+                       for start_index in range(0, len(sent3_ids), 254)]
+
+        if len(sent12_spans[-1]) < min_spans:
+            sent12_spans = sent12_spans[:-1]
+        if len(sent13_spans[-1]) < min_spans:
+            sent13_spans = sent13_spans[:-1]
+        if len(sent2_spans[-1]) < min_spans:
+            sent2_spans = sent2_spans[:-1]
+        if len(sent3_spans[-1]) < min_spans:
+            sent3_spans = sent3_spans[:-1]
+
+        for i in range(len(sent12_spans)):
+            sent12_span = sent12_spans[i]
+            sent13_span = sent13_spans[i]
+
+            # matching
+            pos_matching = []
+            neg_matching = []
+            for sent2_span in sent2_spans:
+                for sent3_span in sent3_spans:
+                    pos_features = combine_and_padding(sent12_span, sent2_span, max_seq_length, delimiter)
+                    neg_features = combine_and_padding(sent13_span, sent3_span, max_seq_length, delimiter)
+
+                    features.append(Features(instance_id=example_id,
+                                             pos_input_ids=pos_features[0],
+                                             pos_input_mask=pos_features[1],
+                                             pos_segment_ids=pos_features[2],
+                                             neg_input_ids=neg_features[0],
+                                             neg_input_mask=neg_features[1],
+                                             neg_segment_ids=neg_features[2]))
 
     return features
 
@@ -143,6 +196,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, margin):
 
     def model_fn(features, labels, mode, params):
+        example_id = features["example_id"]
 
         pos_input_ids = features["pos_input_ids"]
         pos_input_mask = features["pos_input_mask"]
@@ -191,7 +245,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tfes.estimator.ModeKeys.PREDICT:
-            predictions = {"pos_logit": pos_logits, "neg_logit": neg_logits}
+            predictions = {"pos_logit": pos_logits, "neg_logit": neg_logits, "example_id": example_id}
             output_spec = tpu.TPUEstimatorSpec(
                 mode=mode,
                 predictions=predictions,
@@ -205,6 +259,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
 
 
 def input_fn_builder(input_features, seq_length, is_training, drop_remainder):
+    all_example_id = []
     all_pos_input_ids = []
     all_pos_input_mask = []
     all_pos_segment_ids = []
@@ -213,6 +268,7 @@ def input_fn_builder(input_features, seq_length, is_training, drop_remainder):
     all_neg_segment_ids = []
 
     for feature in input_features:
+        all_example_id.append(feature.instance_id)
         all_pos_input_ids.append(feature.pos_input_ids)
         all_pos_input_mask.append(feature.pos_input_mask)
         all_pos_segment_ids.append(feature.pos_segment_ids)
@@ -228,6 +284,8 @@ def input_fn_builder(input_features, seq_length, is_training, drop_remainder):
         num_examples = len(input_features)
 
         d = tf.data.Dataset.from_tensor_slices({
+            "example_id": tf.constant(all_example_id, shape=[num_examples], dtype=tf.int32),
+
             "pos_input_ids": tf.constant(all_pos_input_ids,  shape=[num_examples, seq_length], dtype=tf.int32),
             "pos_input_mask": tf.constant(all_pos_input_mask, shape=[num_examples, seq_length], dtype=tf.int32),
             "pos_segment_ids": tf.constant(all_pos_segment_ids, shape=[num_examples, seq_length], dtype=tf.int32),
@@ -287,17 +345,17 @@ class EvalHook(SessionRunHook):
             global_step = run_context.session.run(self._global_step_tensor)
             if self._timer.should_trigger_for_step(global_step):
                 self._timer.update_last_triggered_step(global_step)
-                metrics = self.evaluation(global_step)
+                metrics = self.evaluation_v2(global_step)
                 # print("================", MAP, MRR, self.th, type(MAP), type(MRR), type(self.th))
-                if metrics["acc"] * 100 > self.th:
+                if metrics["sum_acc"] * 100 > self.th:
                     # print("================", MAP, MRR)
                     self._save(run_context.session, global_step, metrics)
 
     def end(self, session):
         last_step = session.run(self._global_step_tensor)
         if last_step != self._timer.last_triggered_step():
-            metrics = self.evaluation(last_step)
-            if metrics["acc"] * 100 > self.th:
+            metrics = self.evaluation_v2(last_step)
+            if metrics["sum_acc"] * 100 > self.th:
                 self._save(session, last_step, metrics)
 
     def evaluation(self, global_step):
@@ -317,8 +375,45 @@ class EvalHook(SessionRunHook):
         print(f"global_step: {global_step}, acc: {acc}")
         return {"acc": acc}
 
+    def evaluation_v2(self, global_step):
+        dev_input_fn = input_fn_builder(input_features=self.eval_features, seq_length=self.max_seq_length,
+                                        is_training=False, drop_remainder=False)
+        predictions = self.estimator.predict(dev_input_fn, yield_single_examples=True)
+
+        examples_pred = {}
+        for item in tqdm(predictions):
+            pos_logit = item["pos_logit"]
+            neg_logit = item["neg_logit"]
+            example_id = item["example_id"]
+            if str(example_id) in examples_pred:
+                examples_pred[str(example_id)].append([pos_logit, neg_logit])
+            else:
+                examples_pred[str(example_id)] = [pos_logit, neg_logit]
+
+        results_sum = []
+        results_more = []
+        for example_id, logits in examples_pred.items():
+            # method 1: sum
+            pos_logits = [a[0] for a in logits]
+            neg_logits = [a[1] for a in logits]
+            pos_logit = sum(pos_logits)
+            neg_logit = sum(neg_logits)
+
+            results_sum.append(1 if pos_logit > neg_logit else 0)
+
+            # method 2: more
+            num_more_than = sum([a[0] > a[1] for a in logits])  # the number of pos > neg
+            results_more.append(1 if num_more_than >= len(logits) / 2 else 0)
+
+        sum_acc = sum(results_sum) / len(results_sum)
+        more_acc = sum(results_more) / len(results_more)
+        print(f"global_step: {global_step}, sum_acc: {sum_acc}, more_acc: {more_acc}")
+        return {"sum_acc": sum_acc, "more_acc": more_acc}
+
     def _save(self, session, step, metrics):
-        save_file = os.path.join(self.save_model_dir, "step{}_acc{:5.4f}".format(step, metrics["acc"]))
+        save_file = os.path.join(self.save_model_dir,
+                                 "step{}_sumacc{:5.4f}_moreacc{:5.4f}"
+                                 .format(step, metrics["sum_acc"], metrics["more_acc"]))
         list_name = os.listdir(self.org_dir)
         for name in list_name:
             if "model.ckpt-{}".format(step-1) in name:
