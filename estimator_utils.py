@@ -282,6 +282,7 @@ def input_fn_builder(input_features, seq_length, is_training, drop_remainder):
     def input_fn(params):
         batch_size = params["batch_size"]
         num_examples = len(input_features)
+        print("num examples: ", num_examples)
 
         d = tf.data.Dataset.from_tensor_slices({
             "example_id": tf.constant(all_example_id, shape=[num_examples], dtype=tf.int32),
@@ -388,7 +389,7 @@ class EvalHook(SessionRunHook):
             if str(example_id) in examples_pred:
                 examples_pred[str(example_id)].append([pos_logit, neg_logit])
             else:
-                examples_pred[str(example_id)] = [pos_logit, neg_logit]
+                examples_pred[str(example_id)] = [[pos_logit, neg_logit]]
 
         results_sum = []
         results_more = []

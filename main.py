@@ -169,10 +169,10 @@ def train(bert_config, run_config, data_file):
     tokenizer = tokenization.FullTokenizer(
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
-    train_features = convert_ids_to_features(token_ids=train_ids, tokenizer=tokenizer,
-                                             max_seq_length=FLAGS.max_seq_length, is_training=True)
-    dev_features = convert_ids_to_features(token_ids=dev_ids, tokenizer=tokenizer,
-                                           max_seq_length=FLAGS.max_seq_length, is_training=True)
+    train_features = convert_ids_to_features_v2(token_ids=train_ids, tokenizer=tokenizer,
+                                                max_seq_length=FLAGS.max_seq_length, is_training=True, min_spans=10)
+    dev_features = convert_ids_to_features_v2(token_ids=dev_ids, tokenizer=tokenizer,
+                                              max_seq_length=FLAGS.max_seq_length, is_training=True, min_spans=10)
 
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num train examples = %d", len(train_ids))
