@@ -214,8 +214,9 @@ def predict(bert_config, run_config, test_file):
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
     test_ids, test_length = convert_examples(all_examples, tokenizer)
 
-    test_features = convert_ids_to_features(token_ids=test_ids, tokenizer=tokenizer,
-                                            max_seq_length=FLAGS.max_seq_length, is_training=True)
+    test_features = convert_ids_to_features_v2(token_ids=test_ids, tokenizer=tokenizer,
+                                               max_seq_length=FLAGS.max_seq_length, is_training=True,
+                                               min_spans=10, max_spans=(FLAGS.max_seq_length - 3) // 2)
 
     # building estimator
     model_fn = model_fn_builder(
@@ -239,17 +240,38 @@ def predict(bert_config, run_config, test_file):
                                      is_training=False, drop_remainder=False)
     predictions = estimator.predict(test_input_fn, yield_single_examples=True)
 
+    examples_pred = {}
+    for item in tqdm(predictions):
+        pos_logit = item["pos_logit"]
+        neg_logit = item["neg_logit"]
+        example_id = item["example_id"]
+        if str(example_id) in examples_pred:
+            examples_pred[str(example_id)].append([pos_logit, neg_logit])
+        else:
+            examples_pred[str(example_id)] = [[pos_logit, neg_logit]]
+
+    results_sum = []
+    results_more = []
+    for example_id, logits in examples_pred.items():
+        # method 1: sum
+        pos_logits = [a[0] for a in logits]
+        neg_logits = [a[1] for a in logits]
+        pos_logit = sum(pos_logits)
+        neg_logit = sum(neg_logits)
+
+        results_sum.append("A" if pos_logit > neg_logit else "B")
+
+        # method 2: more
+        num_more_than = sum([a[0] > a[1] for a in logits])  # the number of pos > neg
+        results_more.append("A" if num_more_than >= len(logits) / 2 else "B")
+
     output_path = "../output/output.txt"
     if os.path.exists("./output") is False:
         os.mkdir("./output")
     ouf = open(output_path, "w", encoding="utf-8")
-    for item in tqdm(predictions):
-        pos_logit = item["pos_logit"]
-        neg_logit = item["neg_logit"]
-        if pos_logit > neg_logit:
-            print("B", file=ouf)
-        else:
-            print("C", file=ouf)
+
+    output_method = results_sum
+    [print(output_method[i], file=ouf) for i in range(len(output_method))]
     ouf.close()
 
 

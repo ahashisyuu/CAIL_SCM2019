@@ -415,7 +415,7 @@ class EvalHook(SessionRunHook):
         save_file = os.path.join(self.save_model_dir,
                                  "step{}_sumacc{:5.4f}_moreacc{:5.4f}"
                                  .format(step, metrics["sum_acc"], metrics["more_acc"]))
-        list_name = os.listdir(self.org_dir)
+        list_name = os.listdir(self.output_dir)
         for name in list_name:
             if "model.ckpt-{}".format(step-1) in name:
                 org_name = os.path.join(self.output_dir, name)
