@@ -108,7 +108,7 @@ def convert_ids_to_features(token_ids, tokenizer, max_seq_length, is_training):
     return features
 
 
-def convert_ids_to_features_v2(token_ids, tokenizer, max_seq_length, is_training, min_spans=10):
+def convert_ids_to_features_v2(token_ids, tokenizer, max_seq_length, is_training, min_spans=10, max_spans=254):
     delimiter = tokenizer.convert_tokens_to_ids(["[CLS]", "[SEP]"])
 
     features = []
@@ -118,14 +118,14 @@ def convert_ids_to_features_v2(token_ids, tokenizer, max_seq_length, is_training
         sent2_ids = each_token_ids[1]
         sent3_ids = each_token_ids[2]
 
-        sent12_spans = [sent12_ids[start_index:start_index+254]
-                        for start_index in range(0, len(sent12_ids), 254)]
-        sent13_spans = [sent13_ids[start_index:start_index+254]
-                        for start_index in range(0, len(sent13_ids), 254)]
-        sent2_spans = [sent2_ids[start_index:start_index+254]
-                       for start_index in range(0, len(sent2_ids), 254)]
-        sent3_spans = [sent3_ids[start_index:start_index+254]
-                       for start_index in range(0, len(sent3_ids), 254)]
+        sent12_spans = [sent12_ids[start_index:start_index+max_spans]
+                        for start_index in range(0, len(sent12_ids), max_spans)]
+        sent13_spans = [sent13_ids[start_index:start_index+max_spans]
+                        for start_index in range(0, len(sent13_ids), max_spans)]
+        sent2_spans = [sent2_ids[start_index:start_index+max_spans]
+                       for start_index in range(0, len(sent2_ids), max_spans)]
+        sent3_spans = [sent3_ids[start_index:start_index+max_spans]
+                       for start_index in range(0, len(sent3_ids), max_spans)]
 
         if len(sent12_spans[-1]) < min_spans:
             sent12_spans = sent12_spans[:-1]

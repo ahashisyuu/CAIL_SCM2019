@@ -37,7 +37,7 @@ class Config:
     init_checkpoint = bert_dir + 'bert_model.ckpt'
     # init_checkpoint = None
     do_lower_case = True
-    max_seq_length = 511
+    max_seq_length = 456
     margin = 5.0
     do_pro = False
     do_train = True
@@ -47,8 +47,8 @@ class Config:
     learning_rate = 2e-5
     num_train_epochs = 5.0
     warmup_proportion = 0.1
-    save_checkpoints_steps = 100
-    iterations_per_loop = 100
+    save_checkpoints_steps = 500
+    iterations_per_loop = 500
 
 
 config = Config()
@@ -143,7 +143,17 @@ def train(bert_config, run_config, data_file):
         train_ids = data["train_ids"]
         dev_ids = data["dev_ids"]
 
-    num_train_steps = int(len(train_ids) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
+    tokenizer = tokenization.FullTokenizer(
+        vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
+
+    train_features = convert_ids_to_features_v2(token_ids=train_ids, tokenizer=tokenizer,
+                                                max_seq_length=FLAGS.max_seq_length, is_training=True,
+                                                min_spans=10, max_spans=(FLAGS.max_seq_length - 3) // 2)
+    dev_features = convert_ids_to_features_v2(token_ids=dev_ids, tokenizer=tokenizer,
+                                              max_seq_length=FLAGS.max_seq_length, is_training=True,
+                                              min_spans=10, max_spans=(FLAGS.max_seq_length - 3) // 2)
+
+    num_train_steps = int(len(train_features) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
     num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
 
     rng = random.Random(12345)
@@ -166,16 +176,8 @@ def train(bert_config, run_config, data_file):
         train_batch_size=FLAGS.train_batch_size,
         predict_batch_size=FLAGS.eval_batch_size)
 
-    tokenizer = tokenization.FullTokenizer(
-        vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
-
-    train_features = convert_ids_to_features_v2(token_ids=train_ids, tokenizer=tokenizer,
-                                                max_seq_length=FLAGS.max_seq_length, is_training=True, min_spans=10)
-    dev_features = convert_ids_to_features_v2(token_ids=dev_ids, tokenizer=tokenizer,
-                                              max_seq_length=FLAGS.max_seq_length, is_training=True, min_spans=10)
-
     tf.logging.info("***** Running training *****")
-    tf.logging.info("  Num train examples = %d", len(train_ids))
+    tf.logging.info("  Num train examples = %d", len(train_features))
     # tf.logging.info("  Num dev examples = %d", len(dev_ids))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
     tf.logging.info("  Num steps = %d", num_train_steps)
@@ -189,7 +191,7 @@ def train(bert_config, run_config, data_file):
                                     max_seq_length=FLAGS.max_seq_length,
                                     eval_steps=FLAGS.save_checkpoints_steps,
                                     save_model_dir="save_model",
-                                    th=85.0,
+                                    th=77.0,
                                     output_dir=FLAGS.output_dir)]
                     )
 
