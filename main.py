@@ -29,19 +29,19 @@ class Config:
     data_file = "data.json"
     # test_file = "../input/input.txt"
     test_file = "./data/input.txt"
-    # bert_dir = './model/bert/'
+    # bert_dir = '../model/bert/'
     bert_dir = "bert_data/"
     bert_config_file = bert_dir + 'bert_config.json'
     vocab_file = bert_dir + 'vocab.txt'
-    output_dir = './output_model'
-    init_checkpoint = bert_dir + 'bert_model.ckpt'
-    # init_checkpoint = None
+    output_dir = './save_model'
+    # init_checkpoint = bert_dir + 'bert_model.ckpt'
+    init_checkpoint = None
     do_lower_case = True
     max_seq_length = 456
     margin = 5.0
     do_pro = False
-    do_train = True
-    do_eval = False
+    do_train = False
+    do_eval = True
     train_batch_size = 2
     eval_batch_size = 2
     learning_rate = 2e-5
@@ -198,6 +198,7 @@ def train(bert_config, run_config, data_file):
 
 def predict(bert_config, run_config, test_file):
     # processing test dataset
+
     all_examples = []
     with open(test_file, encoding="utf-8") as fr:
         for line in fr:
@@ -259,11 +260,11 @@ def predict(bert_config, run_config, test_file):
         pos_logit = sum(pos_logits)
         neg_logit = sum(neg_logits)
 
-        results_sum.append("A" if pos_logit > neg_logit else "B")
+        results_sum.append("B" if pos_logit > neg_logit else "C")
 
         # method 2: more
         num_more_than = sum([a[0] > a[1] for a in logits])  # the number of pos > neg
-        results_more.append("A" if num_more_than >= len(logits) / 2 else "B")
+        results_more.append("B" if num_more_than >= len(logits) / 2 else "C")
 
     output_path = "../output/output.txt"
     if os.path.exists("./output") is False:
@@ -271,7 +272,7 @@ def predict(bert_config, run_config, test_file):
     ouf = open(output_path, "w", encoding="utf-8")
 
     output_method = results_sum
-    [print(output_method[i], file=ouf) for i in range(len(output_method))]
+    [print(a, file=ouf) for a in output_method]
     ouf.close()
 
 
