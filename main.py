@@ -18,6 +18,7 @@ from tensorflow.contrib import tpu
 from estimator_utils import model_fn_builder, input_fn_builder, \
     convert_ids_to_features, convert_ids_to_features_v2, EvalHook
 from data_process.split_data import Example, convert_examples
+from utils import json2txt
 
 flags = tf.flags
 
@@ -27,8 +28,8 @@ FLAGS = flags.FLAGS
 class Config:
     data_dir = './data'
     data_file = "data.json"
-    # test_file = "../input/input.txt"
-    test_file = "./data/input.txt"
+    test_file = "../input/input.txt"
+    # test_file = "./data/input.txt"
     # bert_dir = '../model/bert/'
     bert_dir = "bert_data/"
     bert_config_file = bert_dir + 'bert_config.json'
@@ -200,12 +201,15 @@ def predict(bert_config, run_config, test_file):
     # processing test dataset
 
     all_examples = []
-    with open(test_file, encoding="utf-8") as fr:
+
+    json2txt(test_file, "./data/test_data.txt")
+
+    with open("./data/test_data.txt", encoding="utf-8") as fr:
         for line in fr:
             data_line = json.loads(line)
-            A = data_line["A"].split('\n')[2]
-            B = data_line["B"].split('\n')[2]
-            C = data_line["C"].split('\n')[2]
+            A = data_line["A"]  # .split('\n')[2]
+            B = data_line["B"]  # .split('\n')[2]
+            C = data_line["C"]  # .split('\n')[2]
 
             example = Example(A=A, B=B, C=C)
 
